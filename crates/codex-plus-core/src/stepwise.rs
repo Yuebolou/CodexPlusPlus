@@ -400,8 +400,12 @@ fn build_upstream_request(
                 "max_tokens": settings.codex_app_stepwise_max_output_tokens,
                 "response_format": { "type": "json_object" },
             });
-            if !model.to_ascii_lowercase().starts_with("kimi-") {
+            let normalized_model = model.to_ascii_lowercase();
+            if !normalized_model.starts_with("kimi-") {
                 body["temperature"] = json!(0.2);
+            }
+            if matches!(normalized_model.as_str(), "kimi-k2.5" | "kimi-k2.6") {
+                body["thinking"] = json!({ "type": "disabled" });
             }
             (format!("{base_url}/chat/completions"), body)
         }
@@ -829,6 +833,43 @@ mod tests {
             .unwrap();
 
             assert_eq!(upstream.body["temperature"], json!(0.2));
+            assert!(upstream.body.get("thinking").is_none());
+        }
+    }
+
+    #[test]
+    fn kimi_chat_completions_disables_thinking_for_short_suggestions() {
+        let settings = test_settings("https://api.moonshot.cn/v1".to_string(), "chat_completions");
+        for model in ["kimi-k2.6", "kimi-k2.5", "KIMI-K2.6"] {
+            let upstream = build_upstream_request(
+                StepwiseProtocol::ChatCompletions,
+                &settings.codex_app_stepwise_base_url,
+                TEST_API_KEY,
+                model,
+                &test_request(),
+                &settings,
+            )
+            .unwrap();
+
+            assert_eq!(upstream.body["thinking"], json!({ "type": "disabled" }));
+        }
+    }
+
+    #[test]
+    fn other_kimi_models_do_not_receive_thinking_override() {
+        let settings = test_settings("https://api.moonshot.cn/v1".to_string(), "chat_completions");
+        for model in ["kimi-k2", "kimi-k2-thinking"] {
+            let upstream = build_upstream_request(
+                StepwiseProtocol::ChatCompletions,
+                &settings.codex_app_stepwise_base_url,
+                TEST_API_KEY,
+                model,
+                &test_request(),
+                &settings,
+            )
+            .unwrap();
+
+            assert!(upstream.body.get("thinking").is_none());
         }
     }
 
