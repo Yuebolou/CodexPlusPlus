@@ -394,16 +394,16 @@ fn build_upstream_request(
     let (endpoint, body) = match protocol {
         StepwiseProtocol::ChatCompletions => {
             insert_bearer_header(&mut headers, api_key)?;
-            (
-                format!("{base_url}/chat/completions"),
-                json!({
-                    "model": model,
-                    "messages": messages,
-                    "temperature": 0.2,
-                    "max_tokens": settings.codex_app_stepwise_max_output_tokens,
-                    "response_format": { "type": "json_object" },
-                }),
-            )
+            let mut body = json!({
+                "model": model,
+                "messages": messages,
+                "max_tokens": settings.codex_app_stepwise_max_output_tokens,
+                "response_format": { "type": "json_object" },
+            });
+            if !model.to_ascii_lowercase().starts_with("kimi-") {
+                body["temperature"] = json!(0.2);
+            }
+            (format!("{base_url}/chat/completions"), body)
         }
         StepwiseProtocol::Responses => {
             insert_bearer_header(&mut headers, api_key)?;
