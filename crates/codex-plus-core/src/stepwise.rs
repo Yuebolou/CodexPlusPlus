@@ -794,6 +794,45 @@ mod tests {
     }
 
     #[test]
+    fn kimi_chat_completions_uses_model_default_temperature() {
+        let settings = test_settings("https://api.moonshot.cn/v1".to_string(), "chat_completions");
+        for model in ["kimi-k2.6", "kimi-k2.5", "KIMI-K2.6"] {
+            let upstream = build_upstream_request(
+                StepwiseProtocol::ChatCompletions,
+                &settings.codex_app_stepwise_base_url,
+                TEST_API_KEY,
+                model,
+                &test_request(),
+                &settings,
+            )
+            .unwrap();
+
+            assert!(
+                upstream.body.get("temperature").is_none(),
+                "{model} must use its model default temperature"
+            );
+        }
+    }
+
+    #[test]
+    fn other_chat_completions_models_keep_existing_temperature() {
+        let settings = test_settings("https://example.test/v1".to_string(), "chat_completions");
+        for model in ["stepwise-test", "moonshot-v1-8k"] {
+            let upstream = build_upstream_request(
+                StepwiseProtocol::ChatCompletions,
+                &settings.codex_app_stepwise_base_url,
+                TEST_API_KEY,
+                model,
+                &test_request(),
+                &settings,
+            )
+            .unwrap();
+
+            assert_eq!(upstream.body["temperature"], json!(0.2));
+        }
+    }
+
+    #[test]
     fn clamp_items_dedupes_and_limits() {
         let items = clamp_items(
             json!([
